@@ -1,0 +1,4 @@
+ARG pytorch_image:'nvcr.io/nvidia/tensorrt'
+
+FROM pytorch_image as base_image
+    RUN apt-get update 
