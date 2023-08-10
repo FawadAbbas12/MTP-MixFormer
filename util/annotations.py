@@ -29,15 +29,6 @@ class Color:
         r, g, b = tuple(int(hex_string[1 + i:1 + i + 2], 16) for i in (0, 2, 4))
         return Color(r=r, g=g, b=b)
 
-@dataclass(frozen=True)
-class BYTETrackerArgs:
-    track_thresh: float = 0.4
-    track_buffer: int = 500
-    match_thresh: float = 0.8
-    aspect_ratio_thresh: float = 3.0
-    min_box_area: float = 10.0
-    mot20: bool = False
-
 # geometry utilities
 @dataclass(frozen=True)
 class Point:
