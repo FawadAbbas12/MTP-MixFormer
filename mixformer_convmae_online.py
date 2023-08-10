@@ -17,6 +17,7 @@ from mixformer_convmae import (
         sample_target ,
         update_config_from_file
     )
+from util import (Detection, Rect) 
 
 class MixFormerOnline():
     def __init__(self, params):
@@ -78,17 +79,17 @@ class MixFormerOnline():
         self.state = info['init_bbox']
         self.frame_id = 0
 
+    @torch.no_grad()
     def update(self, image):
         H, W, _ = image.shape
         self.frame_id += 1
         x_patch_arr, resize_factor, x_amask_arr = sample_target(image, self.state, self.params.search_factor,
                                                                 output_sz=self.params.search_size)  # (x1, y1, w, h)
         search = self.preprocessor.process(x_patch_arr)
-        with torch.no_grad():
-            if self.online_size==1:
-                out_dict, _ = self.network(self.template, self.online_template, search, run_score_head=True)
-            else:
-                out_dict, _ = self.network.forward_test(search, run_score_head=True)
+        if self.online_size==1:
+            out_dict, _ = self.network(self.template, self.online_template, search, run_score_head=True)
+        else:
+            out_dict, _ = self.network.forward_test(search, run_score_head=True)
 
         pred_boxes = out_dict['pred_boxes'].view(-1, 4)
         pred_score = out_dict['pred_scores'].view(1).sigmoid().item()
@@ -120,8 +121,15 @@ class MixFormerOnline():
 
             self.max_pred_score = -1
             self.online_max_template = self.template
+        detection = Detection(
+            Rect(*self.state),
+            0,
+            'target',
+            pred_score
+        )
         return {
             "target_bbox": self.state,
+            "detection_object":[detection],
             "score":pred_score,
             "tempelate":self.online_template
             }
@@ -149,7 +157,7 @@ def build_mixformer_convmae_online(config_file = 'model_zoo/mae_online/baseline.
     params.save_all_boxes = False
     params.checkpoint = cfg.checkpoint
     model = MixFormerOnline(params)
-    return model
+    return model, params
     
     
 def main():
@@ -166,9 +174,10 @@ def main():
                 val = tracker_out.get(key, defaults.get(key, None))
                 if key in tracker_out or val is not None:
                     output[key].append(val)
-    model = build_mixformer_convmae_online()
+    model,_ = build_mixformer_convmae_online()
+
     import time
-    vid = cv2.VideoCapture('data/drowning.mp4')
+    vid = cv2.VideoCapture('data/ftb-1.mp4')
     def read_frame():
         ret, frame = vid.read()    
         try:
@@ -187,7 +196,7 @@ def main():
         frame_disp = frame.copy()
         cv2.putText(frame_disp, 'Select target ROI and press ENTER', (20, 30), cv2.FONT_HERSHEY_COMPLEX_SMALL, 1.5,
                     (0, 0, 0), 1)
-        x, y, w, h = cv2.selectROI('display_name', frame_disp, fromCenter=False)
+        x, y, w, h = cv2.selectROI('display_name', cv2.cvtColor(frame_disp, cv2.COLOR_RGB2BGR), fromCenter=False)
         cv2.destroyAllWindows()
         init_state = [x, y, w, h]
         init_info = {'init_bbox':init_state}
