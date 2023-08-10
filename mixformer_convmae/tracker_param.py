@@ -321,6 +321,12 @@ class TrackerParams:
         """Check if there exist a parameter with the given name."""
         return hasattr(self, name)
 
+    def _to_dict(self):
+        return self.__dict__
+    
+    def from_dict(self, dict):
+        for k,v in dict.items():
+            self.__setattr__(k,v)
 
 class FeatureParams:
     """Class for feature specific parameters"""
