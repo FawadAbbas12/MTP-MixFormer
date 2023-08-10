@@ -1,92 +1,199 @@
-# MixFormer
+## Multi Target proposal MixFormer and KF-based liner occlusion handling
+This is a trimmed-down version of MixFormer to continue on proposed implementation by adding the following features:
+
+- Isolate Mixformer Convmae Online model so it is easy to integrate into other applications  ✅
+- Add an auxiliary Linear motion model Kalman filter to avoid id switch for a short period   ✅
+- Implement reassociation methodology and heuristic for kalman update  
+- Implement center point based multi detection head
+- Add an auxiliary EKF or PSO Based Object Tracking module to maintain tracklet for the original target
+
+# MixFormer (Base REPO)
+
+The official implementation of the CVPR 2022 paper [**MixFormer: End-to-End Tracking with Iterative Mixed Attention**](http://arxiv.org/abs/2203.11082)
+
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mixformer-end-to-end-tracking-with-iterative-2/visual-object-tracking-on-lasot)](https://paperswithcode.com/sota/visual-object-tracking-on-lasot?p=mixformer-end-to-end-tracking-with-iterative-2)
+
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mixformer-end-to-end-tracking-with-iterative-2/visual-object-tracking-on-trackingnet)](https://paperswithcode.com/sota/visual-object-tracking-on-trackingnet?p=mixformer-end-to-end-tracking-with-iterative-2)
+
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/mixformer-end-to-end-tracking-with-iterative-2/visual-object-tracking-on-got-10k)](https://paperswithcode.com/sota/visual-object-tracking-on-got-10k?p=mixformer-end-to-end-tracking-with-iterative-2)
+
+[[Models and Raw results]](https://drive.google.com/drive/folders/1wyeIs3ytYkmAtTXoVlLMkJ4aSTq5CBHq?usp=sharing) (Google Driver)  [[Models and Raw results]](https://pan.baidu.com/s/1k819gnFMav9t1-8ZhCo74w) (Baidu Driver: hmuv)
 
 
+![MixFormer_Framework](tracking/mixformer_merge_framework.png)
 
-## Getting started
+## News
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+**[Feb 10, 2023]** 
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- :fire::fire::fire:  **Code and models for MixViT and MixViT-ConvMAE are available now !** Thank [Tianhui Song](https://github.com/songtianhui) for helping us clean up the code.
 
-## Add your files
+**[Feb 8, 2023]**
+- Extended version has been available at https://arxiv.org/abs/2302.02814. In particular, the extented **MixViT-L(ConvMAE)** achieves AUC score of 73.3% on LaSOT. Besides, we design a new **TrackMAE** pre-training method for tracking. Code and models will be updated soon.
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+**[Oct 26, 2022]**
+
+- MixFormerL (based on MixViT-L) rank  <font color='red'>**1/41 on VOT2022-STb public**</font> dataset. 
+- The <font color='red'>**VOT2022-RGBD and VOT2022-D winners**</font> of MixForRGBD and MixForD, implemented by [Lai Simiao](https://github.com/laisimiao), are constructed upon our MixFormer.
+- The VOT2022-STs winner of MS-AOT employs MixFormer as a part of the tracker.  The VOT2022-STb winner of APMT_MR employs the SPM proposed in MixFormer to select dynamic templates.
+
+**[Mar 29, 2022]**
+
+- Our paper is selected for an <font color='red'> **oral** </font> presentation.
+
+**[Mar 21, 2022]**
+
+- MixFormer is accepted to **CVPR2022**.
+- We release Code, models and raw results.
+
+
+## Highlights
+### :sparkles: New transformer tracking framework
+MixFormer is composed of a **target-search mixed attention (MAM) based backbone** and a simple corner head, 
+yielding a compact tracking pipeline without an explicit integration module.
+
+
+### :sparkles: End-to-end, post-processing-free
+
+Mixformer is an end-to-end tracking framework without post-processing. 
+
+### :sparkles: Strong performance
+| Tracker | VOT2020 (EAO) | LaSOT (NP)| GOT-10K (AO)| TrackingNet (NP)|
+|---|---|---|---|---|
+|**MixViT-L (ConvMAE)**|0.567|**82.8**|-|**90.3**|
+|**MixViT-L**|**0.584**|82.2|**75.7**|90.2|
+|**MixCvT**|0.555|79.9|70.7|88.9|
+|ToMP101* (CVPR2022)|-|79.2|-|86.4|
+|SBT-large* (CVPR2022)|0.529|-|70.4|-|
+|SwinTrack* (Arxiv2021)|-|78.6|69.4|88.2|
+|Sim-L/14* (Arxiv2022)|-|79.7|69.8|87.4|
+|STARK (ICCV2021)|0.505|77.0|68.8|86.9|
+|KeepTrack (ICCV2021)|-|77.2|-|-|
+|TransT (CVPR2021)|0.495|73.8|67.1|86.7|
+|TrDiMP (CVPR2021)|-|-|67.1|83.3|
+|Siam R-CNN (CVPR2020)|-|72.2|64.9|85.4|
+|TREG (Arxiv2021)|-|74.1|66.8|83.8|
+
+## Install the environment
+Use the Anaconda
+```
+conda create -n mixformer python=3.6
+conda activate mixformer
+bash install_pytorch17.sh
+```
+
+## Data Preparation
+Put the tracking datasets in ./data. It should look like:
+   ```
+   ${MixFormer_ROOT}
+    -- data
+        -- lasot
+            |-- airplane
+            |-- basketball
+            |-- bear
+            ...
+        -- got10k
+            |-- test
+            |-- train
+            |-- val
+        -- coco
+            |-- annotations
+            |-- train2017
+        -- trackingnet
+            |-- TRAIN_0
+            |-- TRAIN_1
+            ...
+            |-- TRAIN_11
+            |-- TEST
+   ```
+## Set project paths
+Run the following command to set paths for this project
+```
+python tracking/create_default_local_file.py --workspace_dir . --data_dir ./data --save_dir .
+```
+After running this command, you can also modify paths by editing these two files
+```
+lib/train/admin/local.py  # paths about training
+lib/test/evaluation/local.py  # paths about testing
+```
+
+## Train MixFormer
+Training with multiple GPUs using DDP. More details of 
+other training settings can be found at ```tracking/train_mixformer_[cvt/vit/convmae].sh``` for different backbone respectively.
+```
+# MixFormer with CVT backbone
+bash tracking/train_mixformer_cvt.sh
+
+# MixFormer with ViT backbone
+bash tracking/train_mixformer_vit.sh
+
+# MixFormer with ConvMAE backbone
+bash tracking/train_mixformer_convmae.sh
+```
+
+## Test and evaluate MixFormer on benchmarks
+
+- LaSOT/GOT10k-test/TrackingNet/OTB100/UAV123. More details of 
+test settings can be found at ```tracking/test_mixformer_[cvt/vit/convmae].sh```
+```
+bash tracking/test_mixformer_cvt.sh
+bash tracking/test_mixformer_vit.sh
+bash tracking/test_mixformer_convmae.sh
+```
+
+- VOT2020  
+Before evaluating "MixFormer+AR" on VOT2020, please install some extra packages following [external/AR/README.md](external/AR/README.md). Also, the VOT toolkit is required to evaluate our tracker. To download and instal VOT toolkit, you can follow this [tutorial](https://www.votchallenge.net/howto/tutorial_python.html). For convenience, you can use our example workspaces of VOT toolkit under ```external/vot20/``` by setting ```trackers.ini```.
+```
+cd external/vot20/<workspace_dir>
+vot evaluate --workspace . MixFormerPython
+# generating analysis results
+vot analysis --workspace . --nocache
+```
+
+## Run MixFormer on your own video
+```
+bash tracking/run_video_demo.sh
+```
+
+## Compute FLOPs/Params and test speed
+```
+bash tracking/profile_mixformer.sh
+```
+
+## Visualize attention maps
+```
+bash tracking/vis_mixformer_attn.sh
+```
+![vis_attn](tracking/vis_attn.png)
+
+## Model Zoo and raw results
+The trained models and the raw tracking results are provided in the [[Models and Raw results]](https://drive.google.com/drive/folders/1wyeIs3ytYkmAtTXoVlLMkJ4aSTq5CBHq?usp=sharing) (Google Driver) or
+[[Models and Raw results]](https://pan.baidu.com/s/1k819gnFMav9t1-8ZhCo74w) (Baidu Driver: hmuv).
+
+## Contact
+Yutao Cui: cuiyutao@smail.nju.edu.cn 
+
+## Acknowledgments
+* Thanks for [PyTracking](https://github.com/visionml/pytracking) Library and [STARK](https://github.com/researchmm/Stark) Library, which helps us to quickly implement our ideas.
+* We use the implementation of the CvT from the official repo [CvT](https://github.com/leoxiaobin/CvT).  
+
+## ✏️ Citation
+
+If you think this project is helpful, please feel free to leave a star⭐️ and cite our paper:
 
 ```
-cd existing_repo
-git remote add origin http://10.1.1.180:8000/tas/mixformer.git
-git branch -M main
-git push -uf origin main
+@inproceedings{cui2022mixformer,
+  title={Mixformer: End-to-end tracking with iterative mixed attention},
+  author={Cui, Yutao and Jiang, Cheng and Wang, Limin and Wu, Gangshan},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={13608--13618},
+  year={2022}
+}
+@misc{cui2023mixformer,
+      title={MixFormer: End-to-End Tracking with Iterative Mixed Attention}, 
+      author={Yutao Cui and Cheng Jiang and Gangshan Wu and Limin Wang},
+      year={2023},
+      eprint={2302.02814},
+      archivePrefix={arXiv}
+}
 ```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](http://10.1.1.180:8000/tas/mixformer/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
