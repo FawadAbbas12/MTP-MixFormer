@@ -42,7 +42,7 @@ bash install_pytorch17.sh
 python mixformer_convmae_online.py 
 ```
 
-### Model with Liner KF
+### Model with Linear KF
 ```
 from KF_tracker_wrapper import TrackingModel_2D
 
